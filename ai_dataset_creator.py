@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import time
 
 # --- Page config ---
 st.set_page_config(page_title="AI Dataset Creator", page_icon="🤖", layout="centered")
@@ -11,14 +12,16 @@ if "selected_option" not in st.session_state:
     st.session_state.selected_option = None
 if "df" not in st.session_state:
     st.session_state.df = None
+if "styled" not in st.session_state:
+    st.session_state.styled = False
 
 # --- Greeting ---
 if not st.session_state.messages:
     st.session_state.messages.append(("bot", "👋 Hello! Welcome to **AI Dataset Creator**."))
     st.session_state.messages.append(("bot", "I can help you clean, organize, and create datasets in different formats."))
-    st.session_state.messages.append(("bot", "✨ What do you want to do today? Choose an option below."))
+    st.session_state.messages.append(("bot", "✨ What do you want to do today? Choose an option below:"))
 
-# --- Display chat bubbles ---
+# --- Chat bubble UI ---
 st.markdown("""
     <style>
     .chat-bubble {
@@ -41,6 +44,15 @@ st.markdown("""
         text-align: right;
         margin-left: auto;
     }
+    .send-button {
+        background-color: #007BFF;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 20px;
+        font-size: 16px;
+        cursor: pointer;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -48,7 +60,7 @@ for sender, msg in st.session_state.messages:
     css_class = "bot" if sender == "bot" else "user"
     st.markdown(f"<div class='chat-bubble {css_class}'>{msg}</div>", unsafe_allow_html=True)
 
-# --- Options ---
+# --- Options Menu ---
 options = {
     "🧹 Clean Messy Data": "Paste or upload raw text and the tool cleans & structures it.",
     "📄 Create JSON File": "Input data, arrange it, and download as JSON.",
@@ -56,8 +68,10 @@ options = {
     "📑 Create Excel File": "Input / upload data → download Excel (.xlsx).",
     "📕 Create PDF File": "Convert structured data to a PDF table.",
     "✏️ Edit Data": "Add/Remove Rows & Columns before downloading.",
-    "🎨 Style Data": "Optional formatting (blue headers, bold fonts, highlights).",
-    "📂 Upload Existing File to Convert": "Upload CSV/Excel/JSON → convert to another format."
+    "🎨 Style Data": "Choose fonts, colors, header styles.",
+    "📂 Upload Existing File": "Upload CSV/Excel/JSON → convert to another format.",
+    "🔄 Convert Between Formats": "Select input/output formats directly.",
+    "📊 Visualize Data": "Preview charts or summaries before export."
 }
 
 if st.session_state.selected_option is None:
@@ -74,26 +88,28 @@ if st.session_state.selected_option:
     raw_text = st.text_area("Paste CSV-style data:", height=150)
     uploaded_file = st.file_uploader("Upload CSV or Excel file", type=["csv", "xlsx"])
 
-    if st.button("Process Data"):
-        try:
-            if uploaded_file:
-                if uploaded_file.name.endswith(".csv"):
-                    df = pd.read_csv(uploaded_file)
+    if st.button("Send ➡️", key="process"):
+        with st.spinner("⏳ Creating your dataset..."):
+            time.sleep(2)  # Simulate processing time
+            try:
+                if uploaded_file:
+                    if uploaded_file.name.endswith(".csv"):
+                        df = pd.read_csv(uploaded_file)
+                    else:
+                        df = pd.read_excel(uploaded_file)
+                elif raw_text:
+                    lines = raw_text.strip().split('\n')
+                    headers = [h.strip() for h in lines[0].split(',')]
+                    rows = [[cell.strip() for cell in line.split(',')] for line in lines[1:] if line.strip()]
+                    df = pd.DataFrame(rows, columns=headers)
                 else:
-                    df = pd.read_excel(uploaded_file)
-            elif raw_text:
-                lines = raw_text.strip().split('\n')
-                headers = [h.strip() for h in lines[0].split(',')]
-                rows = [[cell.strip() for cell in line.split(',')] for line in lines[1:] if line.strip()]
-                df = pd.DataFrame(rows, columns=headers)
-            else:
-                st.warning("⚠️ Please paste data or upload a file.")
-                st.stop()
+                    st.warning("⚠️ Please paste data or upload a file.")
+                    st.stop()
 
-            st.session_state.df = df
-            st.success("✅ Data processed successfully! Preview and edit below.")
-        except Exception as e:
-            st.error(f"❌ Error processing data: {e}")
+                st.session_state.df = df
+                st.success("✅ Data created successfully! Scroll down to preview and style.")
+            except Exception as e:
+                st.error(f"❌ Error processing data: {e}")
 
 # --- Preview & Edit ---
 if st.session_state.df is not None:
@@ -101,18 +117,17 @@ if st.session_state.df is not None:
     edited_df = st.experimental_data_editor(st.session_state.df, num_rows="dynamic")
     st.session_state.df = edited_df
 
-    # --- Optional Styling ---
-    if st.session_state.selected_option in ["🎨 Style Data", "📕 Create PDF File"]:
-        st.markdown("### 🎨 Styling Options")
-        header_color = st.color_picker("Header Color", "#007BFF")
-        font_choice = st.selectbox("Font", ["Arial", "Courier", "Times New Roman"])
-        # (Styling logic can be applied during export)
+    # --- Styling Controls ---
+    st.markdown("### 🎨 Style Your Data")
+    header_color = st.color_picker("Header Color", "#007BFF")
+    font_choice = st.selectbox("Font", ["Arial", "Courier", "Times New Roman", "Verdana"])
+    font_size = st.slider("Font Size", 10, 20, 14)
+
+    st.session_state.styled = True
 
     # --- Export Options ---
     st.markdown("### 📤 Download Your Dataset")
     st.download_button("Download JSON", edited_df.to_json(orient="records"), file_name="data.json", mime="application/json")
     st.download_button("Download CSV", edited_df.to_csv(index=False), file_name="data.csv", mime="text/csv")
     st.download_button("Download Excel", edited_df.to_excel("data.xlsx", index=False), file_name="data.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    # PDF export placeholder
-    if st.session_state.selected_option == "📕 Create PDF File":
-        st.info("📕 PDF export coming soon!")
+    st.info("📕 PDF export coming soon with full styling support.")
