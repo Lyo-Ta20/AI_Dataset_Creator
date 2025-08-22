@@ -105,7 +105,7 @@ if st.session_state.selected_option:
 # --- Preview & Edit ---
 if st.session_state.df is not None:
     st.markdown("### 🧠 Preview & Edit")
-    edited_df = st.experimental_data_editor(st.session_state.df, num_rows="dynamic")
+    edited_df = st_data_editor(st.session_state.df, num_rows="dynamic")
     st.session_state.df = edited_df
 
     # --- Styling Controls ---
