@@ -2,9 +2,23 @@ import streamlit as st
 import pandas as pd
 
 # --- Page config ---
-st.set_page_config(page_title="DataForge Studio", page_icon="🧠", layout="centered")
+st.set_page_config(page_title="AI Dataset Creator", page_icon="🤖", layout="centered")
 
-# --- Custom CSS ---
+# --- Session state ---
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+if "selected_option" not in st.session_state:
+    st.session_state.selected_option = None
+if "df" not in st.session_state:
+    st.session_state.df = None
+
+# --- Greeting ---
+if not st.session_state.messages:
+    st.session_state.messages.append(("bot", "👋 Hello! Welcome to **AI Dataset Creator**."))
+    st.session_state.messages.append(("bot", "I can help you clean, organize, and create datasets in different formats."))
+    st.session_state.messages.append(("bot", "✨ What do you want to do today? Choose an option below."))
+
+# --- Display chat bubbles ---
 st.markdown("""
     <style>
     .chat-bubble {
@@ -30,80 +44,75 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- Session state ---
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-if "raw_data" not in st.session_state:
-    st.session_state.raw_data = ""
-if "df" not in st.session_state:
-    st.session_state.df = None
-
-# --- Greeting ---
-if not st.session_state.messages:
-    st.session_state.messages.append(("bot", "👋 Welcome to **DataForge Studio**! Paste your data or upload a file to begin."))
-
-# --- Display chat bubbles ---
 for sender, msg in st.session_state.messages:
     css_class = "bot" if sender == "bot" else "user"
     st.markdown(f"<div class='chat-bubble {css_class}'>{msg}</div>", unsafe_allow_html=True)
 
-# --- Tabs for modular workflow ---
-tab1, tab2, tab3 = st.tabs(["📥 Input", "🧠 Preview & Edit", "📤 Export"])
+# --- Options ---
+options = {
+    "🧹 Clean Messy Data": "Paste or upload raw text and the tool cleans & structures it.",
+    "📄 Create JSON File": "Input data, arrange it, and download as JSON.",
+    "📊 Create CSV File": "Input data or upload messy file → get CSV.",
+    "📑 Create Excel File": "Input / upload data → download Excel (.xlsx).",
+    "📕 Create PDF File": "Convert structured data to a PDF table.",
+    "✏️ Edit Data": "Add/Remove Rows & Columns before downloading.",
+    "🎨 Style Data": "Optional formatting (blue headers, bold fonts, highlights).",
+    "📂 Upload Existing File to Convert": "Upload CSV/Excel/JSON → convert to another format."
+}
 
-# --- Tab 1: Input ---
-with tab1:
-    st.subheader("Paste Raw Data")
-    user_input = st.text_area("Paste CSV-style data (comma-separated):", height=150)
-    if st.button("Submit Text"):
-        if user_input:
-            st.session_state.messages.append(("user", user_input))
-            st.session_state.messages.append(("bot", "✅ Got your data! Preview it in the next tab."))
-            st.session_state.raw_data = user_input
+if st.session_state.selected_option is None:
+    for label, desc in options.items():
+        if st.button(label):
+            st.session_state.messages.append(("user", label))
+            st.session_state.messages.append(("bot", f"✅ You chose: **{label}** — {desc}"))
+            st.session_state.selected_option = label
             st.rerun()
 
-    st.divider()
-    st.subheader("Upload File")
+# --- Data Input ---
+if st.session_state.selected_option:
+    st.markdown("### 📥 Paste Data or Upload File")
+    raw_text = st.text_area("Paste CSV-style data:", height=150)
     uploaded_file = st.file_uploader("Upload CSV or Excel file", type=["csv", "xlsx"])
-    if uploaded_file:
+
+    if st.button("Process Data"):
         try:
-            if uploaded_file.name.endswith(".csv"):
-                df = pd.read_csv(uploaded_file)
+            if uploaded_file:
+                if uploaded_file.name.endswith(".csv"):
+                    df = pd.read_csv(uploaded_file)
+                else:
+                    df = pd.read_excel(uploaded_file)
+            elif raw_text:
+                lines = raw_text.strip().split('\n')
+                headers = [h.strip() for h in lines[0].split(',')]
+                rows = [[cell.strip() for cell in line.split(',')] for line in lines[1:] if line.strip()]
+                df = pd.DataFrame(rows, columns=headers)
             else:
-                df = pd.read_excel(uploaded_file)
+                st.warning("⚠️ Please paste data or upload a file.")
+                st.stop()
+
             st.session_state.df = df
-            st.session_state.messages.append(("bot", f"📁 Uploaded `{uploaded_file.name}` successfully!"))
-            st.rerun()
+            st.success("✅ Data processed successfully! Preview and edit below.")
         except Exception as e:
-            st.error(f"❌ Error reading file: {e}")
+            st.error(f"❌ Error processing data: {e}")
 
-# --- Tab 2: Preview & Edit ---
-with tab2:
-    st.subheader("Parsed Data Preview")
+# --- Preview & Edit ---
+if st.session_state.df is not None:
+    st.markdown("### 🧠 Preview & Edit")
+    edited_df = st.experimental_data_editor(st.session_state.df, num_rows="dynamic")
+    st.session_state.df = edited_df
 
-    def parse_raw_data(raw_text):
-        lines = raw_text.strip().split('\n')
-        headers = [h.strip() for h in lines[0].split(',')]
-        rows = [[cell.strip() for cell in line.split(',')] for line in lines[1:] if line.strip()]
-        return pd.DataFrame(rows, columns=headers)
+    # --- Optional Styling ---
+    if st.session_state.selected_option in ["🎨 Style Data", "📕 Create PDF File"]:
+        st.markdown("### 🎨 Styling Options")
+        header_color = st.color_picker("Header Color", "#007BFF")
+        font_choice = st.selectbox("Font", ["Arial", "Courier", "Times New Roman"])
+        # (Styling logic can be applied during export)
 
-    if st.session_state.df is None and st.session_state.raw_data:
-        try:
-            st.session_state.df = parse_raw_data(st.session_state.raw_data)
-        except Exception as e:
-            st.error(f"⚠️ Failed to parse raw data: {e}")
-
-    if st.session_state.df is not None:
-        edited_df = st.experimental_data_editor(st.session_state.df, num_rows="dynamic")
-        st.session_state.df = edited_df
-        st.success("✅ You can now export your edited data!")
-
-# --- Tab 3: Export ---
-with tab3:
-    st.subheader("Export Your Dataset")
-
-    if st.session_state.df is not None:
-        st.download_button("Download JSON", st.session_state.df.to_json(orient="records"), file_name="data.json", mime="application/json")
-        st.download_button("Download CSV", st.session_state.df.to_csv(index=False), file_name="data.csv", mime="text/csv")
-        st.download_button("Download Excel", st.session_state.df.to_excel("data.xlsx", index=False), file_name="data.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    else:
-        st.info("📋 No data available yet. Paste or upload your dataset in the first tab.")
+    # --- Export Options ---
+    st.markdown("### 📤 Download Your Dataset")
+    st.download_button("Download JSON", edited_df.to_json(orient="records"), file_name="data.json", mime="application/json")
+    st.download_button("Download CSV", edited_df.to_csv(index=False), file_name="data.csv", mime="text/csv")
+    st.download_button("Download Excel", edited_df.to_excel("data.xlsx", index=False), file_name="data.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    # PDF export placeholder
+    if st.session_state.selected_option == "📕 Create PDF File":
+        st.info("📕 PDF export coming soon!")
