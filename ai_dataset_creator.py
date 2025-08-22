@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import time
+from io import StringIO
 
 # --- Page config ---
 st.set_page_config(page_title="AI Dataset Creator", page_icon="🤖", layout="centered")
@@ -43,15 +44,6 @@ st.markdown("""
         color: #fff;
         text-align: right;
         margin-left: auto;
-    }
-    .send-button {
-        background-color: #007BFF;
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 20px;
-        font-size: 16px;
-        cursor: pointer;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -98,10 +90,8 @@ if st.session_state.selected_option:
                     else:
                         df = pd.read_excel(uploaded_file)
                 elif raw_text:
-                    lines = raw_text.strip().split('\n')
-                    headers = [h.strip() for h in lines[0].split(',')]
-                    rows = [[cell.strip() for cell in line.split(',')] for line in lines[1:] if line.strip()]
-                    df = pd.DataFrame(rows, columns=headers)
+                    cleaned_text = "\n".join([line.strip() for line in raw_text.strip().splitlines() if line.strip()])
+                    df = pd.read_csv(StringIO(cleaned_text), skip_blank_lines=True)
                 else:
                     st.warning("⚠️ Please paste data or upload a file.")
                     st.stop()
@@ -109,7 +99,8 @@ if st.session_state.selected_option:
                 st.session_state.df = df
                 st.success("✅ Data created successfully! Scroll down to preview and style.")
             except Exception as e:
-                st.error(f"❌ Error processing data: {e}")
+                st.error(f"❌ Failed to parse data: {e}")
+                st.stop()
 
 # --- Preview & Edit ---
 if st.session_state.df is not None:
