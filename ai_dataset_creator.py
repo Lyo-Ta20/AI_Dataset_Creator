@@ -1,103 +1,91 @@
-# save as ai_dataset_creator.py
 import streamlit as st
-import pandas as pd
-from io import BytesIO
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
-from reportlab.lib import colors
 
-# Import the parser from utils
-from utils.parser import clean_messy_text
+# --- Page config ---
+st.set_page_config(page_title="AI Dataset Creator", page_icon="🤖", layout="centered")
 
-# ------------------------
-# Page config & styling
-# ------------------------
-st.set_page_config(page_title="AI Dataset Creator", page_icon="🤖", layout="wide")
+# --- Custom CSS for Chat-like UI ---
 st.markdown("""
     <style>
     body {
         background-color: #ffffff;
     }
-    .stButton>button {
-        background-color: #1E90FF;
+    .chat-bubble {
+        padding: 10px 15px;
+        border-radius: 15px;
+        margin: 8px 0;
+        max-width: 80%;
+        font-family: 'Open Sans', sans-serif;
+        font-size: 15px;
+        line-height: 1.4;
+    }
+    .bot {
+        background-color: #f1f1f1;
+        color: #000;
+        text-align: left;
+    }
+    .user {
+        background-color: #007BFF;
+        color: #fff;
+        text-align: right;
+        margin-left: auto;
+    }
+    .option-button {
+        display: block;
+        width: 100%;
+        padding: 12px;
+        margin: 6px 0;
+        background-color: #007BFF;
         color: white;
-        font-weight: bold;
+        border: none;
+        border-radius: 10px;
+        font-size: 15px;
+        text-align: left;
+        cursor: pointer;
     }
-    .stTextArea>div>textarea {
-        border: 2px solid #1E90FF;
-        border-radius: 5px;
-    }
-    .stDataFrame {
-        border: 2px solid #1E90FF;
-        border-radius: 5px;
+    .option-button:hover {
+        background-color: #0056b3;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# ------------------------
-# Header
-# ------------------------
-st.title("🤖 AI Dataset Creator")
-st.write("Paste your messy data, I will clean, structure, and let you edit before downloading.")
+# --- Session state for chat ---
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-# ------------------------
-# Step 1: Input messy data
-# ------------------------
-raw_text = st.text_area("📥 Paste your messy data here:")
+# --- Greeting ---
+if not st.session_state.messages:
+    st.session_state.messages.append(("bot", "👋 Hello! Welcome to **AI Dataset Creator**."))
+    st.session_state.messages.append(("bot", "📂 What would you like to do? Choose an option below."))
 
-data = None
-if raw_text:
-    # Use parser from utils
-    data = clean_messy_text(raw_text)
+# --- Display chat bubbles ---
+for sender, msg in st.session_state.messages:
+    css_class = "bot" if sender == "bot" else "user"
+    st.markdown(f"<div class='chat-bubble {css_class}'>{msg}</div>", unsafe_allow_html=True)
 
-# ------------------------
-# Step 2: Editable table
-# ------------------------
-if data is not None and not data.empty:
-    st.subheader("✅ Preview & Edit Your Dataset")
-    edited_data = st.experimental_data_editor(data, num_rows="dynamic")
+# --- Options as buttons ---
+st.markdown("### 🔽 Options")
+options = [
+    "1️⃣ Clean Messy Data",
+    "2️⃣ Create JSON File",
+    "3️⃣ Create CSV File",
+    "4️⃣ Create Excel File",
+    "5️⃣ Create PDF File",
+    "6️⃣ Edit Data",
+    "7️⃣ Style Data (fonts, colors, expand rows/columns)",
+    "8️⃣ Upload Existing File"
+]
 
-    # ------------------------
-    # Step 3: Export options
-    # ------------------------
-    st.subheader("💾 Choose Export Options")
-    export_format = st.selectbox("Which file do you want to create?", ["csv", "json", "excel", "pdf"])
-    filename = st.text_input("File name (without extension):", "my_dataset")
+for option in options:
+    if st.button(option, key=option):
+        st.session_state.messages.append(("user", option))
+        st.session_state.messages.append(("bot", f"✅ You chose: **{option}**. (Feature coming soon!)"))
+        st.rerun()
 
-    # ------------------------
-    # Step 4: Download button
-    # ------------------------
-    if st.button("⬇️ Download File"):
-        if export_format == "csv":
-            st.download_button("Download CSV",
-                               data=edited_data.to_csv(index=False).encode('utf-8'),
-                               file_name=f"{filename}.csv",
-                               mime="text/csv")
-        elif export_format == "json":
-            st.download_button("Download JSON",
-                               data=edited_data.to_json(orient="records", indent=4),
-                               file_name=f"{filename}.json",
-                               mime="application/json")
-        elif export_format == "excel":
-            output = BytesIO()
-            edited_data.to_excel(output, index=False, engine="openpyxl")
-            st.download_button("Download Excel",
-                               data=output.getvalue(),
-                               file_name=f"{filename}.xlsx",
-                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        elif export_format == "pdf":
-            output = BytesIO()
-            doc = SimpleDocTemplate(output)
-            table_data = [edited_data.columns.tolist()] + edited_data.values.tolist()
-            table = Table(table_data)
-            style = TableStyle([
-                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ])
-            table.setStyle(style)
-            doc.build([table])
-            st.download_button("Download PDF",
-                               data=output.getvalue(),
-                               file_name=f"{filename}.pdf",
-                               mime="application/pdf")
-else:
-    st.info("Paste your messy data above to start.")
+# --- Input box ---
+user_input = st.text_input("💬 Type or paste your data here:", "")
+if st.button("Send ➡️"):
+    if user_input:
+        st.session_state.messages.append(("user", user_input))
+        st.session_state.messages.append(("bot", "✅ Got your data! I will process it shortly."))
+        st.rerun()
+
