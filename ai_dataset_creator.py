@@ -91,7 +91,12 @@ if st.session_state.selected_option:
                         df = pd.read_excel(uploaded_file)
                 elif raw_text:
                     cleaned_text = "\n".join([line.strip() for line in raw_text.strip().splitlines() if line.strip()])
-                    df = pd.read_csv(StringIO(cleaned_text), skip_blank_lines=True)
+                    df = pd.read_csv(
+                        StringIO(cleaned_text),
+                        skip_blank_lines=True,
+                        quotechar='"',
+                        on_bad_lines='skip'
+                    )
                 else:
                     st.warning("⚠️ Please paste data or upload a file.")
                     st.stop()
